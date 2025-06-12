@@ -17,6 +17,7 @@ limitations under the License.
 package repo // import "helm.sh/helm/v4/pkg/repo"
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
@@ -27,6 +28,9 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
+
+	"github.com/gofrs/flock"
 
 	"helm.sh/helm/v4/pkg/getter"
 	"helm.sh/helm/v4/pkg/helmpath"
@@ -106,13 +110,51 @@ func (r *ChartRepository) DownloadIndexFile() (string, error) {
 	for name := range indexFile.Entries {
 		fmt.Fprintln(&charts, name)
 	}
+
 	chartsFile := filepath.Join(r.CachePath, helmpath.CacheChartsFile(r.Config.Name))
 	os.MkdirAll(filepath.Dir(chartsFile), 0755)
-	os.WriteFile(chartsFile, []byte(charts.String()), 0644)
 
-	// Create the index file in the cache directory
 	fname := filepath.Join(r.CachePath, helmpath.CacheIndexFile(r.Config.Name))
 	os.MkdirAll(filepath.Dir(fname), 0755)
+
+	// context for lock files
+	lockCtx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
+	// lock the charts file
+	chLock := flock.New(filepath.Join(r.CachePath, helmpath.CacheChartsFile(r.Config.Name)+".lock"))
+	slog.Debug(fmt.Sprintf("[%s] try lock ch: %s, %d;", time.Now().Format("15:04:05"), r.Config.Name, os.Getpid()))
+	chLocked, err := chLock.TryLockContext(lockCtx, 500*time.Millisecond)
+	slog.Debug(fmt.Sprintf("[%s] lock ch: %s, %d; err=%v;status=%t;", time.Now().Format("15:04:05"), r.Config.Name, os.Getpid(), err, chLocked))
+	if err == nil && chLocked {
+		defer func() {
+			slog.Debug(fmt.Sprintf("[%s] unlock ch: %s, %d", time.Now().Format("15:04:05"), r.Config.Name, os.Getpid()))
+			chLock.Unlock()
+		}()
+	}
+	if err != nil {
+		return "", err
+	}
+
+	// write charts files after lock
+	os.WriteFile(chartsFile, []byte(charts.String()), 0644)
+
+	// lock the index file
+	idxLock := flock.New(filepath.Join(r.CachePath, helmpath.CacheIndexFile(r.Config.Name)+".lock"))
+	slog.Debug(fmt.Sprintf("[%s] try lock idx: %s, %d;", time.Now().Format("15:04:05"), r.Config.Name, os.Getpid()))
+	idxLocked, err := idxLock.TryLockContext(lockCtx, 500*time.Millisecond)
+	slog.Debug(fmt.Sprintf("[%s] lock idx: %s, %d; err=%v;status=%t;", time.Now().Format("15:04:05"), r.Config.Name, os.Getpid(), err, idxLocked))
+	if err == nil && idxLocked {
+		defer func() {
+			slog.Debug(fmt.Sprintf("[%s] unlock idx: %s, %d", time.Now().Format("15:04:05"), r.Config.Name, os.Getpid()))
+			idxLock.Unlock()
+		}()
+	}
+	if err != nil {
+		return "", err
+	}
+
+	// Create the index file in the cache directory
 	return fname, os.WriteFile(fname, index, 0644)
 }
 

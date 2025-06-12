@@ -1,0 +1,21 @@
+apiVersion: v1
+repositories:
+  - name: companyinfo
+    url: https://charts.companyinfo.dev
+    username: ""
+    password: ""
+    insecure_skip_tls_verify: true
+    enableOCI: false
+  - name: helmize.dev
+    url: https://helmize.dev
+    username: ""
+    password: ""
+    insecure_skip_tls_verify: true
+    enableOCI: false
+  - name: komodorio
+    url: https://helm-charts.komodor.io
+    username: ""
+    password: ""
+    insecure_skip_tls_verify: true
+    enableOCI: false
+

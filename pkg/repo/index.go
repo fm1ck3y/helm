@@ -18,6 +18,7 @@ package repo
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -30,6 +31,7 @@ import (
 	"time"
 
 	"github.com/Masterminds/semver/v3"
+	"github.com/gofrs/flock"
 	"sigs.k8s.io/yaml"
 
 	"helm.sh/helm/v4/internal/fileutil"
@@ -103,6 +105,24 @@ func NewIndexFile() *IndexFile {
 
 // LoadIndexFile takes a file at the given path and returns an IndexFile object
 func LoadIndexFile(path string) (*IndexFile, error) {
+	lockCtx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
+	idxLock := flock.New(filepath.Join(path + ".lock"))
+
+	slog.Debug(fmt.Sprintf("[%s] try rlock idx: %s, %d;", time.Now().Format("15:04:05"), filepath.Base(path), os.Getpid()))
+	idxLocked, err := idxLock.TryRLockContext(lockCtx, 500*time.Millisecond)
+	slog.Debug(fmt.Sprintf("[%s] rlock idx: %s, %d; err=%v;status=%t;", time.Now().Format("15:04:05"), filepath.Base(path), os.Getpid(), err, idxLocked))
+	if err == nil && idxLocked {
+		defer func() {
+			slog.Debug(fmt.Sprintf("[%s] unrlock idx: %s, %d", time.Now().Format("15:04:05"), filepath.Base(path), os.Getpid()))
+			idxLock.Unlock()
+		}()
+	}
+	if err != nil {
+		return nil, err
+	}
+
 	b, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
@@ -225,6 +245,19 @@ func (i IndexFile) Get(name, version string) (*ChartVersion, error) {
 //
 // The mode on the file is set to 'mode'.
 func (i IndexFile) WriteFile(dest string, mode os.FileMode) error {
+	lockCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	idxLock := flock.New(dest + ".lock")
+	idxLocked, err := idxLock.TryLockContext(lockCtx, 500*time.Millisecond)
+
+	if err == nil && idxLocked {
+		defer idxLock.Unlock()
+	}
+	if err != nil {
+		return err
+	}
+
 	b, err := yaml.Marshal(i)
 	if err != nil {
 		return err
@@ -237,6 +270,19 @@ func (i IndexFile) WriteFile(dest string, mode os.FileMode) error {
 //
 // The mode on the file is set to 'mode'.
 func (i IndexFile) WriteJSONFile(dest string, mode os.FileMode) error {
+	lockCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	idxLock := flock.New(dest + ".lock")
+	idxLocked, err := idxLock.TryLockContext(lockCtx, 500*time.Millisecond)
+
+	if err == nil && idxLocked {
+		defer idxLock.Unlock()
+	}
+	if err != nil {
+		return err
+	}
+
 	b, err := json.MarshalIndent(i, "", "  ")
 	if err != nil {
 		return err
