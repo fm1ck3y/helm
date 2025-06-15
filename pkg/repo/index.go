@@ -105,7 +105,7 @@ func NewIndexFile() *IndexFile {
 
 // LoadIndexFile takes a file at the given path and returns an IndexFile object
 func LoadIndexFile(path string) (*IndexFile, error) {
-	lockCtx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	lockCtx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 	defer cancel()
 
 	idxLock := flock.New(filepath.Join(path + ".lock"))
@@ -245,7 +245,7 @@ func (i IndexFile) Get(name, version string) (*ChartVersion, error) {
 //
 // The mode on the file is set to 'mode'.
 func (i IndexFile) WriteFile(dest string, mode os.FileMode) error {
-	lockCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	lockCtx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 	defer cancel()
 
 	idxLock := flock.New(dest + ".lock")
@@ -270,7 +270,7 @@ func (i IndexFile) WriteFile(dest string, mode os.FileMode) error {
 //
 // The mode on the file is set to 'mode'.
 func (i IndexFile) WriteJSONFile(dest string, mode os.FileMode) error {
-	lockCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	lockCtx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 	defer cancel()
 
 	idxLock := flock.New(dest + ".lock")

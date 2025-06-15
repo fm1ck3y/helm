@@ -118,7 +118,7 @@ func (r *ChartRepository) DownloadIndexFile() (string, error) {
 	os.MkdirAll(filepath.Dir(fname), 0755)
 
 	// context for lock files
-	lockCtx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	lockCtx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 	defer cancel()
 
 	// lock the charts file

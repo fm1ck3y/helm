@@ -1,5 +1,7 @@
 #!/bin/sh
 
+set -e
+
 HELM_BIN=${HELM_BIN:-$(pwd)/../bin/helm}
 CONCURRENCY_COUNT="${CONCURRENCY_COUNT:=5}"
 TEMP_DIR=$(mktemp -p $(pwd) -d)
@@ -17,6 +19,8 @@ helmtemplate() {
 }
 
 helmrepoupdate(){
+  $HELM_BIN repo add company https://charts.companyinfo.dev
+  $HELM_BIN repo add helmize https://helmize.dev/
   ($HELM_BIN --debug repo update) && echo "helm repo update success" || echo "helm repo update failed"
 }
 
@@ -25,10 +29,13 @@ flowdepbuild(){
  helmtemplate $1 
 }
 
+helmrepoupdate
+
 helmrepoupdate &
 for i in $(seq 0 $CONCURRENCY_COUNT); do 
  cp -r $(pwd)/charts/my-concurency-chart $TEMP_DIR/my-concurency-chart-${i}
  (flowdepbuild "my-concurency-chart-$i") &
+ sleep 0.02
  pids+=("$!")
 done
 
